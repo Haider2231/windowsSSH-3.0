@@ -1,3 +1,13 @@
+import os
+import sys
+
+# Add UglyWidgets to sys.path
+# Assuming UglyWidgets is a sibling directory to the one containing gui.py
+# Adjust the path if UglyWidgets is located elsewhere relative to gui.py
+uglywidgets_path = os.path.join(os.path.dirname(__file__), "UglyWidgets")
+if uglywidgets_path not in sys.path:
+    sys.path.insert(0, uglywidgets_path)
+
 from PyQt6 import QtWidgets, QtCore, QtGui
 from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, QLabel,

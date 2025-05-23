@@ -1,6 +1,24 @@
 import os
 import sys
 
+# Add UglyWidgets to sys.path
+uglywidgets_path = os.path.join(os.path.dirname(__file__), "UglyWidgets")
+if uglywidgets_path not in sys.path:
+    sys.path.insert(0, uglywidgets_path)
+
+from PyQt6.QtWebEngineCore import QWebEngineUrlScheme # Import QWebEngineUrlScheme
+
+# Register the custom 'ssh' scheme early
+# It's important to do this before the QApplication is created or the scheme is used.
+# Corrected condition: check if the scheme name is empty
+if QWebEngineUrlScheme.schemeByName(b"ssh").name().isEmpty(): # Check if not already registered
+    ssh_scheme = QWebEngineUrlScheme(b"ssh")
+    # You can set properties for the scheme if needed, e.g.:
+    # ssh_scheme.setSyntax(QWebEngineUrlScheme.Syntax.HostAndPort)
+    # ssh_scheme.setDefaultPort(22) # Default port for this scheme if not specified in URL
+    # ssh_scheme.setFlags(QWebEngineUrlScheme.Flag.SecureScheme | QWebEngineUrlScheme.Flag.CorsEnabled)
+    QWebEngineUrlScheme.registerScheme(ssh_scheme)
+
 # Busca la ruta de los DLLs de PyQt6-WebEngine automáticamente
 def add_pyqt6_dll_dir():
     import site
