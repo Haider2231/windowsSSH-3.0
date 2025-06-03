@@ -26,11 +26,11 @@ class Backend(QObject):
                 # Use the port in the connect method and add a timeout (e.g., 30 seconds)
                 self.client.connect(hostname=host, port=port, username=username, password=password, look_for_keys=False, timeout=30)
             except paramiko.AuthenticationException as e:
-                print(f"Failed to authenticate: {e}")
+                raise Exception(f"Autenticación fallida: {e}")
             except paramiko.SSHException as e:
-                print(f"SSH connection failed: {e}")
+                raise Exception(f"Error SSH: {e}")
             except Exception as e:
-                print(e)
+                raise Exception(f"Error de conexión: {e}")
 
             # setup paramiko channel
             try:
@@ -53,7 +53,8 @@ class Backend(QObject):
             self.reader_thread.data_ready.connect(self.send_output)
             self.reader_thread.start()
         except Exception as e:
-            print(e)
+            # Propaga la excepción para que la GUI la capture
+            raise
 
     @pyqtSlot(str)
     def write_data(self, data):

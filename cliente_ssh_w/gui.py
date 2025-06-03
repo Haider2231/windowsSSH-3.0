@@ -18,7 +18,7 @@ from qtssh_widget import Ui_Terminal  # Usar el widget correcto
 class Vista(QMainWindow):
     def __init__(self, controlador, default_host, default_port, default_usuario, default_clave):
         super().__init__()
-        self.setWindowTitle("Cliente SSH Upiloto - PyQt6")
+        self.setWindowTitle("Cliente SSH Upiloto")
         self.resize(800, 600)
         self.setStyleSheet("""
             QWidget {
@@ -133,7 +133,6 @@ class Vista(QMainWindow):
             self.show_error("Host, usuario y clave son obligatorios.")
             return
 
-        # Preparamos los parámetros para el widget Ui_Terminal
         ssh_params = {
             "host": host_val,
             "port": port_val,
@@ -148,10 +147,18 @@ class Vista(QMainWindow):
             self.ssh_terminal_widget.deleteLater()
             self.ssh_terminal_widget = None
 
-        # Usar Ui_Terminal como widget de terminal
-        self.ssh_terminal_widget = Ui_Terminal(connect_info=ssh_params, parent=self.terminal_container_widget)
-        self.terminal_layout.addWidget(self.ssh_terminal_widget)
-        self.terminal_container_widget.setVisible(True)
+        try:
+            self.ssh_terminal_widget = Ui_Terminal(connect_info=ssh_params, parent=self.terminal_container_widget)
+            self.terminal_layout.addWidget(self.ssh_terminal_widget)
+            self.terminal_container_widget.setVisible(True)
+        except Exception as e:
+            self.show_error("No se pudo conectar: credenciales incorrectas o error de conexión.\n" + str(e))
+            self.form_widget.setVisible(True)
+            self.settings_button.setVisible(True)
+            self.terminal_container_widget.setVisible(False)
+            if self.ssh_terminal_widget:
+                self.ssh_terminal_widget.deleteLater()
+                self.ssh_terminal_widget = None
         # El controlador original (self.controlador) ya no se usa para la conexión aquí,
         # ya que Ui_Terminal maneja su propia lógica de conexión SSH.
 
