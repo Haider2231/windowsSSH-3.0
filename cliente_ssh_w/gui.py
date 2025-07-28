@@ -14,6 +14,7 @@ from PyQt6.QtWidgets import (
     QMessageBox, QSizePolicy, QFrame, QGroupBox, QFormLayout
 )
 from qtssh_widget import Ui_Terminal  # Usar el widget correcto
+from agente_copilot import CopilotAgentWidget
 
 class Vista(QMainWindow):
     def __init__(self, controlador, default_host, default_port, default_usuario, default_clave):
@@ -72,6 +73,12 @@ class Vista(QMainWindow):
         self.settings_button.setFixedSize(32, 32)
         self.settings_button.clicked.connect(self.on_settings_clicked)
         header_layout.addWidget(self.settings_button)
+
+        self.copilot_button = QPushButton("🤖 Copilot")
+        self.copilot_button.setFixedSize(100, 32)
+        self.copilot_button.clicked.connect(self.on_copilot_clicked)
+        header_layout.addWidget(self.copilot_button)
+
         self.main_layout.addLayout(header_layout)
 
         line = QFrame()
@@ -109,13 +116,23 @@ class Vista(QMainWindow):
         form_layout.addRow(self.connect_button)
 
     def _crear_terminal_area(self):
+        # Crear un splitter horizontal para terminal y Copilot
+        self.terminal_splitter = QtWidgets.QSplitter(QtCore.Qt.Orientation.Horizontal)
         self.terminal_container_widget = QWidget()
         self.terminal_layout = QVBoxLayout()
         self.terminal_container_widget.setLayout(self.terminal_layout)
-        self.main_layout.addWidget(self.terminal_container_widget)
+        self.terminal_splitter.addWidget(self.terminal_container_widget)
+        # Widget Copilot (inicialmente oculto)
+        self.copilot_widget = None
+        self.copilot_panel = QWidget()
+        self.copilot_layout = QVBoxLayout(self.copilot_panel)
+        self.copilot_panel.setMinimumWidth(350)
+        self.copilot_panel.setVisible(False)
+        self.terminal_splitter.addWidget(self.copilot_panel)
+        self.main_layout.addWidget(self.terminal_splitter)
         self.terminal_container_widget.setVisible(False)
         self.ssh_terminal_widget = None
-
+        self.ssh_backend = None  # Referencia al backend SSH
 
     def on_connect_clicked(self):
         host_val = self.host_entry.text() or self.default_host
@@ -146,11 +163,14 @@ class Vista(QMainWindow):
         if self.ssh_terminal_widget:
             self.ssh_terminal_widget.deleteLater()
             self.ssh_terminal_widget = None
+            self.ssh_backend = None
 
         try:
             self.ssh_terminal_widget = Ui_Terminal(connect_info=ssh_params, parent=self.terminal_container_widget)
             self.terminal_layout.addWidget(self.ssh_terminal_widget)
             self.terminal_container_widget.setVisible(True)
+            # Guardar referencia al backend SSH
+            self.ssh_backend = getattr(self.ssh_terminal_widget, 'backend', None)
         except Exception as e:
             self.show_error("No se pudo conectar: credenciales incorrectas o error de conexión.\n" + str(e))
             self.form_widget.setVisible(True)
@@ -159,6 +179,7 @@ class Vista(QMainWindow):
             if self.ssh_terminal_widget:
                 self.ssh_terminal_widget.deleteLater()
                 self.ssh_terminal_widget = None
+            self.ssh_backend = None
         # El controlador original (self.controlador) ya no se usa para la conexión aquí,
         # ya que Ui_Terminal maneja su propia lógica de conexión SSH.
 
@@ -170,6 +191,24 @@ class Vista(QMainWindow):
         visible = self.host_entry.isVisible()
         self.host_entry.setVisible(not visible)
         self.port_entry.setVisible(not visible)
+
+    def on_copilot_clicked(self):
+        # Alternar visibilidad del panel Copilot sin cambiar el tamaño de la terminal
+        if self.copilot_widget is None:
+            self.copilot_widget = CopilotAgentWidget(ssh_backend=self.ssh_backend)
+            self.copilot_layout.addWidget(self.copilot_widget)
+        is_visible = self.copilot_panel.isVisible()
+        self.copilot_panel.setVisible(not is_visible)
+        if not is_visible:
+            # Agrandar la ventana principal para mostrar el chat sin reducir la terminal
+            main_width = self.width()
+            copilot_width = self.copilot_panel.minimumWidth() if self.copilot_panel.minimumWidth() > 0 else 350
+            self.resize(main_width + copilot_width, self.height())
+        else:
+            # Si se oculta el chat, reducir la ventana
+            main_width = self.width()
+            copilot_width = self.copilot_panel.minimumWidth() if self.copilot_panel.minimumWidth() > 0 else 350
+            self.resize(max(main_width - copilot_width, 800), self.height())
 
     def closeEvent(self, event):
         try:
