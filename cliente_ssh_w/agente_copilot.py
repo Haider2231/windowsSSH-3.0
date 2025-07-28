@@ -14,11 +14,35 @@ class CopilotAgentWidget(QtWidgets.QWidget):
             QPushButton { background-color: #0078d7; color: white; border-radius: 5px; padding: 6px 12px; }
             QPushButton:hover { background-color: #005fa1; }
         """)
+
         self.layout = QtWidgets.QVBoxLayout(self)
+
+        # Selector de modo
+        self.agent_mode = "ASK"
+        self.mode_selector = QtWidgets.QComboBox()
+        self.mode_selector.addItems(["Ask", "Agent"])
+        self.mode_selector.setCurrentText("Ask")
+        self.mode_selector.setFixedWidth(100)
+        self.mode_selector.currentTextChanged.connect(self._on_mode_changed)
+
+        # Botón de nuevo chat
+        self.new_chat_button = QtWidgets.QPushButton("Nuevo chat")
+        self.new_chat_button.setFixedWidth(100)
+        self.new_chat_button.clicked.connect(self._reset_conversation)
+
+        # Encabezado con selector y botón
+        self.top_controls = QtWidgets.QHBoxLayout()
+        self.top_controls.addWidget(self.mode_selector)
+        self.top_controls.addWidget(self.new_chat_button)
+        self.top_controls.addStretch()
+        self.layout.addLayout(self.top_controls)
+
+        # Área de chat
         self.chat_area = QtWidgets.QTextEdit()
         self.chat_area.setReadOnly(True)
         self.layout.addWidget(self.chat_area)
-        
+
+        # Entrada de usuario y botón enviar
         self.input_layout = QtWidgets.QHBoxLayout()
         self.prompt_entry = QtWidgets.QLineEdit()
         self.prompt_entry.setPlaceholderText("Escribe tu pregunta o instrucción...")
@@ -28,6 +52,7 @@ class CopilotAgentWidget(QtWidgets.QWidget):
         self.input_layout.addWidget(self.send_button)
         self.layout.addLayout(self.input_layout)
 
+        # Inicialización
         load_dotenv()
         self.openai_client = None
         self._init_openai()
@@ -36,7 +61,6 @@ class CopilotAgentWidget(QtWidgets.QWidget):
             self.ssh_backend.send_output.connect(self._on_ssh_output)
         self.waiting_for_ssh = False
 
-        # Prompt de sistema para dar contexto al agente
         self.system_prompt = (
             "Eres un agente inteligente integrado en una terminal embebida de Linux y también Eres un asistente experto en Linux y administración de servidores. "
             "Tu objetivo es facilitar, automatizar y enseñar el uso de Linux a los usuarios, incluso si no tienen experiencia previa. "
@@ -48,10 +72,7 @@ class CopilotAgentWidget(QtWidgets.QWidget):
             "Si el usuario no es específico, deduce la intención y responde con el comando más útil para la tarea en un bloque de código. "
             "Recuerda: tu prioridad es enseñar y automatizar el uso de Linux de la forma más sencilla posible para el usuario."
         )
-        self.conversation_history = [
-            {"role": "system", "content": self.system_prompt}
-        ]
-        self._send_system_prompt()
+        self._reset_conversation()  # inicia el historial
 
     def _init_openai(self):
         api_key = os.environ.get("OPENAI_API_KEY")
@@ -60,16 +81,23 @@ class CopilotAgentWidget(QtWidgets.QWidget):
             return
         self.openai_client = openai.OpenAI(api_key=api_key)
 
+    def _reset_conversation(self):
+        self.conversation_history = [{"role": "system", "content": self.system_prompt}]
+        self.chat_area.clear()
+        self._send_system_prompt()
+
     def _send_system_prompt(self):
-        # Enviar el contexto al modelo al iniciar
         try:
-            response = self.openai_client.chat.completions.create(
+            self.openai_client.chat.completions.create(
                 model="gpt-3.5-turbo",
                 messages=[{"role": "system", "content": self.system_prompt}]
             )
-            # No mostramos la respuesta, solo inicializamos el contexto
         except Exception as e:
             self.chat_area.append(f"<span style='color:red'>[Error al inicializar contexto: {str(e)}]</span>")
+
+    def _on_mode_changed(self, text):
+        self.agent_mode = text.upper()
+        self._reset_conversation()
 
     def on_send(self):
         prompt = self.prompt_entry.text().strip()
@@ -77,18 +105,17 @@ class CopilotAgentWidget(QtWidgets.QWidget):
             return
         self.chat_area.append(f"<b>Tú:</b> {prompt}")
         self.prompt_entry.clear()
-        # Detectar intención de acción y mejorar el prompt
-        action_words = [
-            'listame', 'muéstrame', 'muestrame', 'crea', 'borra', 'elimina', 'instala', 'actualiza', 'reinicia',
-            'ejecuta', 'quiero', 'cómo hago', 'como hago', 'haz', 'genera', 'copia', 'mueve', 'renombra', 'descarga', 'sube', 'edita', 'cambia', 'asigna', 'quita', 'agrega', 'agregame', 'dame el comando', 'dame solo el comando', 'dame el script', 'dame el código', 'dame el comando exacto', 'dame el comando en bash', 'dame el comando en un bloque de código'
-        ]
-        prompt_lower = prompt.lower()
-        if any(word in prompt_lower for word in action_words):
-            prompt = (
-                f"{prompt}. Dame solo el comando exacto en bash para esto, en un bloque de código, sin explicación."
+
+        # Construir prompt para el modelo según el modo
+        if self.agent_mode == "AGENT":
+            prompt_for_ai = f"Dame solo el comando exacto en bash para esto, en un bloque de código, sin explicación: {prompt}"
+        else:
+            prompt_for_ai = (
+                f"Explica de forma clara, profesional y concisa como un experto en Linux y administración de servidores. "
+                f"Si corresponde, incluye ejemplos de comandos, pero no seas excesivamente extenso. Pregunta: {prompt}"
             )
-        # Agregar el mensaje del usuario al historial
-        self.conversation_history.append({"role": "user", "content": prompt})
+
+        self.conversation_history.append({"role": "user", "content": prompt_for_ai})
         QtCore.QTimer.singleShot(100, lambda: self._ask_openai())
 
     def _ask_openai(self):
@@ -98,10 +125,9 @@ class CopilotAgentWidget(QtWidgets.QWidget):
                 messages=self.conversation_history
             )
             content = response.choices[0].message.content.strip()
-            # Agregar la respuesta al historial
             self.conversation_history.append({"role": "assistant", "content": content})
             code = self._extract_code(content)
-            if code and self.ssh_backend:
+            if code and self.ssh_backend and self.agent_mode == "AGENT":
                 self.chat_area.append(f"<b>Copilot:</b> <pre>{html.escape(code)}</pre>")
                 self._send_ssh_command(code)
             else:
@@ -121,11 +147,9 @@ class CopilotAgentWidget(QtWidgets.QWidget):
         return "\n".join(code_lines) if code_lines else None
 
     def _send_ssh_command(self, code):
-        # Enviar el código como comando al backend SSH
         if self.ssh_backend:
             self.waiting_for_ssh = True
-            self.last_command = code  # Guardar el último comando enviado
-            # Asegura que el comando termine con un salto de línea
+            self.last_command = code
             if not code.endswith("\n"):
                 code += "\n"
             self.ssh_backend.write_data(code)
@@ -135,16 +159,12 @@ class CopilotAgentWidget(QtWidgets.QWidget):
 
     def _on_ssh_output(self, data):
         if self.waiting_for_ssh:
-            import html
             self.chat_area.append(f"<b>SSH:</b> <pre>{html.escape(data)}</pre>")
             self.waiting_for_ssh = False
-            # Enviar la salida de la terminal a OpenAI para explicación
             QtCore.QTimer.singleShot(100, lambda: self._explain_ssh_output(data))
 
     def _explain_ssh_output(self, ssh_output):
-        # Enviar la salida de la terminal a OpenAI para que la explique
         try:
-            # Agregar la salida de la terminal como mensaje de usuario
             prompt = (
                 f"Acabo de ejecutar el comando: {self.last_command.strip()} en una terminal Linux. "
                 f"Esta fue la salida:\n{ssh_output}\n\nExplícale al usuario de forma sencilla qué significa esta salida y qué archivos o información se listó, si aplica."
