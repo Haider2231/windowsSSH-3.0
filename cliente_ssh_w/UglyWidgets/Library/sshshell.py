@@ -1,5 +1,5 @@
 from PyQt6.QtCore import QObject, pyqtSignal, pyqtSlot
-from Library.sshshellreader import ShellReaderThread
+from .sshshellreader import ShellReaderThread
 
 import paramiko
 

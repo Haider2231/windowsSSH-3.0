@@ -6,6 +6,10 @@ uglywidgets_path = os.path.join(os.path.dirname(__file__), "UglyWidgets")
 if uglywidgets_path not in sys.path:
     sys.path.insert(0, uglywidgets_path)
 
+library_path = os.path.join(os.path.dirname(__file__), "UglyWidgets", "Library")
+if library_path not in sys.path:
+    sys.path.insert(0, library_path)
+
 from PyQt6.QtWebEngineCore import QWebEngineUrlScheme # Import QWebEngineUrlScheme
 
 # Register the custom 'ssh' scheme early

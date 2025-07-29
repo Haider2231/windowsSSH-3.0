@@ -1,6 +1,6 @@
 from PyQt6.QtCore import QObject, pyqtSignal, pyqtSlot
-from Library.winshellreader import ShellReaderThread
-from winpty import PtyProcess
+from .winshellreader import ShellReaderThread
+from pywinpty import PtyProcess
 import platform
 
 class Backend(QObject):

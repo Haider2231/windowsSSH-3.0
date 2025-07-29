@@ -8,8 +8,8 @@ from PyQt6.QtWidgets import QApplication, QWidget, QVBoxLayout, QMainWindow
 from PyQt6.QtWebEngineWidgets import QWebEngineView
 from PyQt6.QtWebEngineCore import QWebEngineProfile
 from PyQt6.QtWebChannel import QWebChannel
-from Library.sshschemahandler import WebEngineUrlSchemeHandler
-from Library.sshshell import Backend
+from .Library.sshschemahandler import WebEngineUrlSchemeHandler
+from .Library.sshshell import Backend
 
 class Ui_Terminal(QWidget):
     """
