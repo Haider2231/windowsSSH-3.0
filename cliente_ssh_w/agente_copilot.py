@@ -3,6 +3,7 @@ import openai
 import html
 import markdown
 from dotenv import load_dotenv
+from PyQt6.QtGui import QTextOption
 from PyQt6 import QtWidgets, QtCore
 
 
@@ -35,10 +36,18 @@ class CopilotAgentWidget(QtWidgets.QWidget):
 
         # Área de chat
         self.chat_area = QtWidgets.QTextEdit()
+        self.chat_area.document().setDefaultStyleSheet("""
+  pre {
+    white-space: pre-wrap;       /* permite quiebre de línea */
+    word-wrap: break-word;       /* quiebra palabras largas */
+  }
+""")
+        self.chat_area.setLineWrapMode(QtWidgets.QTextEdit.LineWrapMode.WidgetWidth)
+        self.chat_area.setWordWrapMode(QTextOption.WrapMode.WordWrap)
         self.chat_area.setReadOnly(True)
         self.chat_area.setAcceptRichText(True)
-        self.chat_area.setMinimumHeight(300) 
-        self.chat_area.setMinimumWidth(200) 
+        self.chat_area.setMinimumHeight(320) 
+        self.chat_area.setMinimumWidth(220) 
         self.layout.addWidget(self.chat_area)
 
         # Entrada de usuario y botón enviar
