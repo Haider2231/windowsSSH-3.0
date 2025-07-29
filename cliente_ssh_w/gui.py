@@ -13,7 +13,7 @@ from PyQt6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QPushButton, QLineEdit, QLabel,
     QMessageBox, QSizePolicy, QFrame, QGroupBox, QFormLayout
 )
-from qtssh_widget import Ui_Terminal  # Usar el widget correcto
+from UglyWidgets.qtssh_widget import Ui_Terminal  # Usar el widget correcto
 from agente_copilot import CopilotAgentWidget
 
 class Vista(QMainWindow):
@@ -21,29 +21,6 @@ class Vista(QMainWindow):
         super().__init__()
         self.setWindowTitle("Cliente SSH Upiloto")
         self.resize(800, 600)
-        self.setStyleSheet("""
-            QWidget {
-                font-family: 'Segoe UI';
-                font-size: 14px;
-            }
-            QPushButton {
-                background-color: #0078d7;
-                color: white;
-                padding: 6px 12px;
-                border-radius: 5px;
-            }
-            QPushButton:hover {
-                background-color: #005fa1;
-            }
-            QLineEdit {
-                padding: 6px;
-                border: 1px solid #ccc;
-                border-radius: 4px;
-            }
-            QLabel {
-                font-weight: bold;
-            }
-        """)
 
         self.controlador = controlador
         self.default_host = default_host
@@ -61,6 +38,16 @@ class Vista(QMainWindow):
         self._crear_header()
         self._crear_formulario_conexion()
         self._crear_terminal_area()
+        self._load_styles()
+
+    def _load_styles(self):
+        """Carga el archivo QSS desde styles/main.qss"""
+        try:
+            qss_path = os.path.join(os.path.dirname(__file__), "styles", "main.qss")
+            with open(qss_path, "r", encoding="utf-8") as f:
+                self.setStyleSheet(f.read())
+        except Exception as e:
+            print(f"Error al cargar estilos: {e}")
 
     def _crear_header(self):
         header_layout = QHBoxLayout()

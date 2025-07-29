@@ -1,19 +1,15 @@
 import os
 import openai
 import html
+import markdown
 from dotenv import load_dotenv
-from PyQt6 import QtWidgets, QtCore, QtGui
+from PyQt6 import QtWidgets, QtCore
+
 
 class CopilotAgentWidget(QtWidgets.QWidget):
     def __init__(self, ssh_backend=None, parent=None):
         super().__init__(parent)
         self.setWindowTitle("Agente Copilot SSH")
-        self.setStyleSheet("""
-            QWidget { font-family: 'Segoe UI'; font-size: 14px; }
-            QLineEdit, QTextEdit { border-radius: 4px; border: 1px solid #ccc; padding: 6px; }
-            QPushButton { background-color: #0078d7; color: white; border-radius: 5px; padding: 6px 12px; }
-            QPushButton:hover { background-color: #005fa1; }
-        """)
 
         self.layout = QtWidgets.QVBoxLayout(self)
 
@@ -40,6 +36,7 @@ class CopilotAgentWidget(QtWidgets.QWidget):
         # Área de chat
         self.chat_area = QtWidgets.QTextEdit()
         self.chat_area.setReadOnly(True)
+        self.chat_area.setAcceptRichText(True)
         self.layout.addWidget(self.chat_area)
 
         # Entrada de usuario y botón enviar
@@ -72,7 +69,8 @@ class CopilotAgentWidget(QtWidgets.QWidget):
             "Si el usuario no es específico, deduce la intención y responde con el comando más útil para la tarea en un bloque de código. "
             "Recuerda: tu prioridad es enseñar y automatizar el uso de Linux de la forma más sencilla posible para el usuario."
         )
-        self._reset_conversation()  # inicia el historial
+        self._reset_conversation()
+        self._load_styles()
 
     def _init_openai(self):
         api_key = os.environ.get("OPENAI_API_KEY")
@@ -103,10 +101,9 @@ class CopilotAgentWidget(QtWidgets.QWidget):
         prompt = self.prompt_entry.text().strip()
         if not prompt or not self.openai_client:
             return
-        self.chat_area.append(f"<b>Tú:</b> {prompt}")
+        self.chat_area.append(f"<b>Tú:</b> {html.escape(prompt)}<br>")
         self.prompt_entry.clear()
 
-        # Construir prompt para el modelo según el modo
         if self.agent_mode == "AGENT":
             prompt_for_ai = f"Dame solo el comando exacto en bash para esto, en un bloque de código, sin explicación: {prompt}"
         else:
@@ -126,14 +123,23 @@ class CopilotAgentWidget(QtWidgets.QWidget):
             )
             content = response.choices[0].message.content.strip()
             self.conversation_history.append({"role": "assistant", "content": content})
+
+            html_content = self._render_markdown(content)
+            self.chat_area.append(f"<b>Copilot:</b><br>{html_content}<br>")
+
             code = self._extract_code(content)
             if code and self.ssh_backend and self.agent_mode == "AGENT":
-                self.chat_area.append(f"<b>Copilot:</b> <pre>{html.escape(code)}</pre>")
                 self._send_ssh_command(code)
-            else:
-                self.chat_area.append(f"<b>Copilot:</b> {content}")
+
         except Exception as e:
-            self.chat_area.append(f"<span style='color:red'>[Error] {str(e)}</span>")
+            self.chat_area.append(f"<span style='color:red'>[Error] {html.escape(str(e))}</span>")
+
+    def _render_markdown(self, md_text):
+        try:
+            html_text = markdown.markdown(md_text, extensions=["fenced_code"])
+            return html_text
+        except Exception as e:
+            return f"<pre>Error al renderizar Markdown: {html.escape(str(e))}</pre>"
 
     def _extract_code(self, content):
         code_lines = []
@@ -153,13 +159,13 @@ class CopilotAgentWidget(QtWidgets.QWidget):
             if not code.endswith("\n"):
                 code += "\n"
             self.ssh_backend.write_data(code)
-            self.chat_area.append("<i>Enviando comando al servidor SSH...</i>")
+            self.chat_area.append("<i>Enviando comando al servidor SSH...</i><br>")
         else:
-            self.chat_area.append("<span style='color:red'>[Error] No hay conexión SSH activa.</span>")
+            self.chat_area.append("<span style='color:red'>[Error] No hay conexión SSH activa.</span><br>")
 
     def _on_ssh_output(self, data):
         if self.waiting_for_ssh:
-            self.chat_area.append(f"<b>SSH:</b> <pre>{html.escape(data)}</pre>")
+            self.chat_area.append(f"<b>SSH:</b><br><pre>{html.escape(data)}</pre><br>")
             self.waiting_for_ssh = False
             QtCore.QTimer.singleShot(100, lambda: self._explain_ssh_output(data))
 
@@ -176,6 +182,16 @@ class CopilotAgentWidget(QtWidgets.QWidget):
             )
             content = response.choices[0].message.content.strip()
             self.conversation_history.append({"role": "assistant", "content": content})
-            self.chat_area.append(f"<b>Copilot (explicación):</b> {content}")
+            html_content = self._render_markdown(content)
+            self.chat_area.append(f"<b>Copilot (explicación):</b><br>{html_content}<br>")
         except Exception as e:
-            self.chat_area.append(f"<span style='color:red'>[Error explicando salida SSH: {str(e)}]</span>")
+            self.chat_area.append(f"<span style='color:red'>[Error explicando salida SSH: {html.escape(str(e))}]</span>")
+
+    def _load_styles(self):
+        """Carga los estilos desde styles/copilot.qss"""
+        try:
+            qss_path = os.path.join(os.path.dirname(__file__), "styles", "copilot.qss")
+            with open(qss_path, "r", encoding="utf-8") as f:
+                self.setStyleSheet(f.read())
+        except Exception as e:
+            print(f"Error al cargar estilos del Copilot: {e}")
