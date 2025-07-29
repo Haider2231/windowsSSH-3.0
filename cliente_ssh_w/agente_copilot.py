@@ -37,6 +37,8 @@ class CopilotAgentWidget(QtWidgets.QWidget):
         self.chat_area = QtWidgets.QTextEdit()
         self.chat_area.setReadOnly(True)
         self.chat_area.setAcceptRichText(True)
+        self.chat_area.setMinimumHeight(300) 
+        self.chat_area.setMinimumWidth(200) 
         self.layout.addWidget(self.chat_area)
 
         # Entrada de usuario y botón enviar

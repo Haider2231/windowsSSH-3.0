@@ -40,6 +40,11 @@ class Vista(QMainWindow):
         self._crear_terminal_area()
         self._load_styles()
 
+        # Cargar últimas credenciales guardadas
+        settings = QtCore.QSettings("Upiloto", "SSHClient")
+        last_user = settings.value("user", "")
+        self.user_entry.setText(last_user)
+
     def _load_styles(self):
         """Carga el archivo QSS desde styles/main.qss"""
         try:
@@ -156,7 +161,6 @@ class Vista(QMainWindow):
             self.ssh_terminal_widget = Ui_Terminal(connect_info=ssh_params, parent=self.terminal_container_widget)
             self.terminal_layout.addWidget(self.ssh_terminal_widget)
             self.terminal_container_widget.setVisible(True)
-            # Guardar referencia al backend SSH
             self.ssh_backend = getattr(self.ssh_terminal_widget, 'backend', None)
         except Exception as e:
             self.show_error("No se pudo conectar: credenciales incorrectas o error de conexión.\n" + str(e))
@@ -167,8 +171,6 @@ class Vista(QMainWindow):
                 self.ssh_terminal_widget.deleteLater()
                 self.ssh_terminal_widget = None
             self.ssh_backend = None
-        # El controlador original (self.controlador) ya no se usa para la conexión aquí,
-        # ya que Ui_Terminal maneja su propia lógica de conexión SSH.
 
     @QtCore.pyqtSlot(str)
     def show_error(self, message):
