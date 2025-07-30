@@ -1,12 +1,15 @@
 import os
 import sys
 
+def get_resource_path(relative_path):
+    return os.path.join(os.path.dirname(__file__), relative_path)
+
 # Add UglyWidgets to sys.path
-uglywidgets_path = os.path.join(os.path.dirname(__file__), "UglyWidgets")
+uglywidgets_path = get_resource_path("UglyWidgets")
 if uglywidgets_path not in sys.path:
     sys.path.insert(0, uglywidgets_path)
 
-library_path = os.path.join(os.path.dirname(__file__), "UglyWidgets", "Library")
+library_path = get_resource_path("UglyWidgets/Library")
 if library_path not in sys.path:
     sys.path.insert(0, library_path)
 

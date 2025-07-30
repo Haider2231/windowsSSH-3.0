@@ -7,6 +7,10 @@ from PyQt6.QtGui import QTextOption
 from PyQt6 import QtWidgets, QtCore
 
 
+def get_resource_path(relative_path):
+    return os.path.join(os.path.dirname(__file__), relative_path)
+
+
 class CopilotAgentWidget(QtWidgets.QWidget):
     def __init__(self, ssh_backend=None, parent=None):
         super().__init__(parent)
@@ -61,7 +65,7 @@ class CopilotAgentWidget(QtWidgets.QWidget):
         self.layout.addLayout(self.input_layout)
 
         # Inicialización
-        load_dotenv()
+        load_dotenv(get_resource_path('.env'))
         self.openai_client = None
         self._init_openai()
         self.ssh_backend = ssh_backend

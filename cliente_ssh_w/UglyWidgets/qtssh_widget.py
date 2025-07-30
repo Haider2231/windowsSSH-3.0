@@ -58,7 +58,6 @@ class Ui_Terminal(QWidget):
         self.view.loadFinished.connect(self.handle_load_finished)
         self.backend.send_output.connect(lambda data: self.view.page().runJavaScript(f"window.handle_output({json.dumps(data)})"))
 
-        # Cambiar a una ruta absoluta basada en la ubicación del archivo actual
         html_path = os.path.join(os.path.dirname(__file__), "qtsshcon.html")
         self.view.load(QUrl.fromLocalFile(os.path.abspath(html_path)))
         layout.addWidget(self.view)

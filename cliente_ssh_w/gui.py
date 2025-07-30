@@ -47,8 +47,12 @@ class Vista(QMainWindow):
 
     def _load_styles(self):
         """Carga el archivo QSS desde styles/main.qss"""
+        def get_resource_path(relative_path):
+            return os.path.join(os.path.dirname(__file__), relative_path)
+
+        # Update styles path
+        qss_path = get_resource_path("styles/main.qss")
         try:
-            qss_path = os.path.join(os.path.dirname(__file__), "styles", "main.qss")
             with open(qss_path, "r", encoding="utf-8") as f:
                 self.setStyleSheet(f.read())
         except Exception as e:

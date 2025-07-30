@@ -5,7 +5,7 @@ a = Analysis(
     ['main.py'],
     pathex=[],
     binaries=[],
-    datas=[('resources/piloto.ico', 'resources'), ('styles/copilot.qss', 'styles'), ('styles/main.qss', 'styles'), ('UglyWidgets/static/sshconfrontend.js', 'UglyWidgets/static'), ('UglyWidgets/static/winconfrontend.js', 'UglyWidgets/static'), ('UglyWidgets/static/xterm-addon-fit.min.js', 'UglyWidgets/static'), ('UglyWidgets/static/xterm.min.css', 'UglyWidgets/static'), ('UglyWidgets/static/xterm.min.js', 'UglyWidgets/static'), ('UglyWidgets/qtsshcon.html', 'UglyWidgets')],
+    datas=[('resources/piloto.ico', 'resources'), ('styles/copilot.qss', 'styles'), ('styles/main.qss', 'styles'), ('UglyWidgets/static/sshconfrontend.js', 'UglyWidgets/static'), ('UglyWidgets/static/winconfrontend.js', 'UglyWidgets/static'), ('UglyWidgets/static/xterm-addon-fit.min.js', 'UglyWidgets/static'), ('UglyWidgets/static/xterm.min.css', 'UglyWidgets/static'), ('UglyWidgets/static/xterm.min.js', 'UglyWidgets/static'), ('UglyWidgets/qtsshcon.html', 'UglyWidgets'), ('.env', '.')],
     hiddenimports=[],
     hookspath=[],
     hooksconfig={},
