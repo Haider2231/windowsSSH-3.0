@@ -2,8 +2,6 @@ import os
 import sys
 
 # Add UglyWidgets to sys.path
-# Assuming UglyWidgets is a sibling directory to the one containing gui.py
-# Adjust the path if UglyWidgets is located elsewhere relative to gui.py
 uglywidgets_path = os.path.join(os.path.dirname(__file__), "UglyWidgets")
 if uglywidgets_path not in sys.path:
     sys.path.insert(0, uglywidgets_path)
@@ -20,7 +18,7 @@ class Vista(QMainWindow):
     def __init__(self, controlador, default_host, default_port, default_usuario, default_clave):
         super().__init__()
         self.setWindowTitle("Cliente SSH Upiloto")
-        self.resize(800, 600)
+        self.resize(1200, 700)
 
         self.controlador = controlador
         self.default_host = default_host
@@ -28,29 +26,29 @@ class Vista(QMainWindow):
         self.default_usuario = default_usuario
         self.default_clave = default_clave
 
-        # Widget central y layout principal
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
         self.main_layout = QVBoxLayout()
-        self.main_layout.setContentsMargins(60, 40, 60, 40)
+        self.main_layout.setContentsMargins(20, 20, 20, 20)
         central_widget.setLayout(self.main_layout)
 
         self._crear_header()
         self._crear_formulario_conexion()
-        self._crear_terminal_area()
         self._load_styles()
 
-        # Cargar últimas credenciales guardadas
         settings = QtCore.QSettings("Upiloto", "SSHClient")
         last_user = settings.value("user", "")
         self.user_entry.setText(last_user)
 
+        self.terminal_panel = None
+        self.terminal_container = None
+        self.ssh_terminal_widget = None
+        self.ssh_backend = None
+        self.copilot_widget = None
+
     def _load_styles(self):
-        """Carga el archivo QSS desde styles/main.qss"""
         def get_resource_path(relative_path):
             return os.path.join(os.path.dirname(__file__), relative_path)
-
-        # Update styles path
         qss_path = get_resource_path("styles/main.qss")
         try:
             with open(qss_path, "r", encoding="utf-8") as f:
@@ -111,25 +109,6 @@ class Vista(QMainWindow):
         self.connect_button.clicked.connect(self.on_connect_clicked)
         form_layout.addRow(self.connect_button)
 
-    def _crear_terminal_area(self):
-        # Crear un splitter horizontal para terminal y Copilot
-        self.terminal_splitter = QtWidgets.QSplitter(QtCore.Qt.Orientation.Horizontal)
-        self.terminal_container_widget = QWidget()
-        self.terminal_layout = QVBoxLayout()
-        self.terminal_container_widget.setLayout(self.terminal_layout)
-        self.terminal_splitter.addWidget(self.terminal_container_widget)
-        # Widget Copilot (inicialmente oculto)
-        self.copilot_widget = None
-        self.copilot_panel = QWidget()
-        self.copilot_layout = QVBoxLayout(self.copilot_panel)
-        self.copilot_panel.setMinimumWidth(350)
-        self.copilot_panel.setVisible(False)
-        self.terminal_splitter.addWidget(self.copilot_panel)
-        self.main_layout.addWidget(self.terminal_splitter)
-        self.terminal_container_widget.setVisible(False)
-        self.ssh_terminal_widget = None
-        self.ssh_backend = None  # Referencia al backend SSH
-
     def on_connect_clicked(self):
         host_val = self.host_entry.text() or self.default_host
         user_val = self.user_entry.text() or self.default_usuario
@@ -153,27 +132,40 @@ class Vista(QMainWindow):
             "password": password_val
         }
 
-        self.form_widget.setVisible(False)
-        self.settings_button.setVisible(False)
-
-        if self.ssh_terminal_widget:
-            self.ssh_terminal_widget.deleteLater()
-            self.ssh_terminal_widget = None
-            self.ssh_backend = None
+        if self.terminal_panel:
+            self.terminal_panel.deleteLater()
+            self.terminal_panel = None
 
         try:
-            self.ssh_terminal_widget = Ui_Terminal(connect_info=ssh_params, parent=self.terminal_container_widget)
-            self.terminal_layout.addWidget(self.ssh_terminal_widget)
-            self.terminal_container_widget.setVisible(True)
+            self.terminal_panel = QWidget()
+            terminal_layout = QHBoxLayout()
+            terminal_layout.setContentsMargins(0, 20, 0, 0)
+            self.terminal_panel.setLayout(terminal_layout)
+
+            self.terminal_container = QWidget()
+            terminal_container_layout = QVBoxLayout()
+            terminal_container_layout.setContentsMargins(0, 0, 0, 0)
+            self.terminal_container.setLayout(terminal_container_layout)
+            self.terminal_container.setFixedWidth(780)  # Terminal entre 750-800 px
+
+            self.ssh_terminal_widget = Ui_Terminal(connect_info=ssh_params, parent=self.terminal_container)
+            terminal_container_layout.addWidget(self.ssh_terminal_widget)
+
             self.ssh_backend = getattr(self.ssh_terminal_widget, 'backend', None)
+
+            terminal_layout.addWidget(self.terminal_container)
+            self.main_layout.addWidget(self.terminal_panel)
+
+            self.form_widget.setVisible(False)
+            self.settings_button.setVisible(False)
+
         except Exception as e:
             self.show_error("No se pudo conectar: credenciales incorrectas o error de conexión.\n" + str(e))
-            self.form_widget.setVisible(True)
-            self.settings_button.setVisible(True)
-            self.terminal_container_widget.setVisible(False)
-            if self.ssh_terminal_widget:
-                self.ssh_terminal_widget.deleteLater()
-                self.ssh_terminal_widget = None
+            if self.terminal_panel:
+                self.terminal_panel.deleteLater()
+            self.terminal_panel = None
+            self.terminal_container = None
+            self.ssh_terminal_widget = None
             self.ssh_backend = None
 
     @QtCore.pyqtSlot(str)
@@ -186,22 +178,18 @@ class Vista(QMainWindow):
         self.port_entry.setVisible(not visible)
 
     def on_copilot_clicked(self):
-        # Alternar visibilidad del panel Copilot sin cambiar el tamaño de la terminal
-        if self.copilot_widget is None:
-            self.copilot_widget = CopilotAgentWidget(ssh_backend=self.ssh_backend)
-            self.copilot_layout.addWidget(self.copilot_widget)
-        is_visible = self.copilot_panel.isVisible()
-        self.copilot_panel.setVisible(not is_visible)
-        if not is_visible:
-            # Agrandar la ventana principal para mostrar el chat sin reducir la terminal
-            main_width = self.width()
-            copilot_width = self.copilot_panel.minimumWidth() if self.copilot_panel.minimumWidth() > 0 else 350
-            self.resize(main_width + copilot_width, self.height())
-        else:
-            # Si se oculta el chat, reducir la ventana
-            main_width = self.width()
-            copilot_width = self.copilot_panel.minimumWidth() if self.copilot_panel.minimumWidth() > 0 else 350
-            self.resize(max(main_width - copilot_width, 800), self.height())
+        if not self.terminal_panel:
+            self.show_error("Conéctate primero para activar el copiloto.")
+            return
+
+        if self.copilot_widget:
+            self.copilot_widget.deleteLater()
+            self.copilot_widget = None
+            return
+
+        self.copilot_widget = CopilotAgentWidget(ssh_backend=self.ssh_backend)
+        self.copilot_widget.setFixedWidth(400)  # Copilot entre 350-450 px
+        self.terminal_panel.layout().addWidget(self.copilot_widget)
 
     def closeEvent(self, event):
         try:
