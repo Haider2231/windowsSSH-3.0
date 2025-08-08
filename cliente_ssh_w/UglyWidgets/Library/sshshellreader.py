@@ -4,29 +4,29 @@ from PyQt6.QtCore import pyqtSignal, QThread
 class ShellReaderThread(QThread):
     data_ready = pyqtSignal(str)
 
-    def __init__(self, channel, buffer, parent_widget):
+    def __init__(self, channel):
         super().__init__()
         self.channel = channel
-        self.intial_buffer = buffer
-        self.parrent_widget = parent_widget
+        self._stopped = False
 
     def run(self):
-        while True:
-            if not self.channel.closed:
-                try:
+        while not self.isInterruptionRequested() and not self.channel.closed:
+            try:
+                # Detección de cierre de canal (Paramiko)
+                if self.channel.exit_status_ready() and not self.channel.recv_ready():
+                    print("SSH channel exit status ready and no more data.")
+                    break
+                if self.channel.recv_ready():
                     data = self.channel.recv(1024)
-
                     if data:
-                        # for debugging
-                        if self.intial_buffer == "":
-                            self.intial_buffer = bytes(data).decode('utf-8')
-                            # print(bytes(data).decode('utf-8'))
-                            # self.parrent_widget.view.page().runJavaScript(f"window.handle_output({bytes(data).decode('utf-8')}")
-                            self.parrent_widget.initial_buffer = bytes(data).decode('utf-8')
+                        text = data.decode(errors='ignore')
+                        self.data_ready.emit(text)
+                else:
+                    QThread.msleep(10)  # cede CPU 10 ms
+            except Exception as e:
+                print(f"Error while reading from channel: {e}")
+        print("ShellReaderThread terminado.")
 
-                        self.data_ready.emit(data.decode())
-                except Exception as e:
-                    print(f"Error while reading from channel: {e}")
-            else:
-                print("Channel closed...")
-                break
+    def stop(self):
+        self.requestInterruption()
+        self._stopped = True

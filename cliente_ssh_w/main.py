@@ -1,68 +1,64 @@
+
+
 import os
 import sys
+from dotenv import load_dotenv
+load_dotenv()
+from PyQt6 import QtWidgets
+from PyQt6.QtWebEngineCore import QWebEngineUrlScheme
+from gui.vista import Vista
+from controller import Controlador
+from resources import resource_path, load_qss
+from copilot.openai_service import OpenAIService
+from copilot.markdown_service import MarkdownService
+from copilot.copilot_controller import CopilotController
 
-def get_resource_path(relative_path):
-    return os.path.join(os.path.dirname(__file__), relative_path)
-
-# Add UglyWidgets to sys.path
-uglywidgets_path = get_resource_path("UglyWidgets")
+import sys
+# Add UglyWidgets to sys.path (mover aquí desde vista.py)
+uglywidgets_path = resource_path("UglyWidgets")
 if uglywidgets_path not in sys.path:
     sys.path.insert(0, uglywidgets_path)
-
-library_path = get_resource_path("UglyWidgets/Library")
+library_path = resource_path("UglyWidgets/Library")
 if library_path not in sys.path:
     sys.path.insert(0, library_path)
 
-from PyQt6.QtWebEngineCore import QWebEngineUrlScheme # Import QWebEngineUrlScheme
-
 # Register the custom 'ssh' scheme early
-# It's important to do this before the QApplication is created or the scheme is used.
-# Corrected condition: check if the scheme name is empty
-if QWebEngineUrlScheme.schemeByName(b"ssh").name().isEmpty(): # Check if not already registered
+if QWebEngineUrlScheme.schemeByName(b"ssh").name().isEmpty():
     ssh_scheme = QWebEngineUrlScheme(b"ssh")
-    # You can set properties for the scheme if needed, e.g.:
-    # ssh_scheme.setSyntax(QWebEngineUrlScheme.Syntax.HostAndPort)
-    # ssh_scheme.setDefaultPort(22) # Default port for this scheme if not specified in URL
-    # ssh_scheme.setFlags(QWebEngineUrlScheme.Flag.SecureScheme | QWebEngineUrlScheme.Flag.CorsEnabled)
     QWebEngineUrlScheme.registerScheme(ssh_scheme)
 
-# Busca la ruta de los DLLs de PyQt6-WebEngine automáticamente
-def add_pyqt6_dll_dir():
-    import site
-    for path in site.getsitepackages() + [site.getusersitepackages()]:
-        qt_bin = os.path.join(path, "PyQt6", "Qt6", "bin")
-        if os.path.isdir(qt_bin):
-            os.add_dll_directory(qt_bin)
-            return
-    # Si no se encuentra, muestra advertencia
-    print("ADVERTENCIA: No se encontró la carpeta de DLLs de PyQt6-WebEngine.")
 
-add_pyqt6_dll_dir()
-
-from PyQt6 import QtWidgets # Mantenemos QtWidgets, QtCore podría no ser necesario aquí directamente
-from gui import Vista
-from controller import Controlador # Asumimos que el controlador aún se usa
 
 def main():
     try:
-        default_host = "200.115.181.211"
-        default_port = 9000
-        host = default_host
-        puerto = default_port # Aseguramos que puerto esté definido
-        usuario = "tu_usuario"  # Reemplaza con tu usuario real
-        clave = "tu_clave"      # Reemplaza con tu clave real
+        default_host = os.environ.get("DEFAULT_HOST", "")
+        default_port = int(os.environ.get("DEFAULT_PORT", "22"))
+        usuario = os.environ.get("DEFAULT_USER", "")
+        clave = os.environ.get("DEFAULT_PASS", "")
 
-        # El controlador podría necesitar ser ajustado o eliminado si el widget maneja todo.
-        # Por ahora, lo pasamos como antes.
-        controlador = Controlador(host, puerto, usuario, clave)
-                                        
+        # Inicializa servicios
+        api_key = os.environ.get("OPENAI_API_KEY")
+        if not api_key:
+            QtWidgets.QMessageBox.critical(None, "Error crítico", "No se encontró la clave OPENAI_API_KEY en el entorno.")
+            sys.exit(1)
+        openai_service = OpenAIService(api_key)
+        markdown_service = MarkdownService()
+
+        # Inicializa controlador SSH (si lo usas)
+        controlador = Controlador(default_host, default_port, usuario, clave)
+
+        # Pasa el servicio SSH al controlador Copilot
+        copilot_controller = CopilotController(openai_service, markdown_service, ssh_service=controlador)
+
         app = QtWidgets.QApplication(sys.argv)
-        # Pasamos las credenciales a Vista para que pueda inicializar el QtSSH_Widget
-        vista = Vista(controlador, default_host, default_port, usuario, clave)
+        app.setStyleSheet(load_qss("styles/main.qss"))
+
+        # Pasa el controlador Copilot a la Vista
+        vista = Vista(controlador, default_host, default_port, usuario, clave, copilot_controller)
         vista.show()
-        sys.exit(app.exec()) # app.exec() en PyQt6
+        sys.exit(app.exec())
     except Exception as e:
-        print(f"Error en main: {e}") # Mejor seguimiento de errores
+        QtWidgets.QMessageBox.critical(None, "Error crítico", f"Error en main: {e}")
 
 if __name__ == "__main__":
     main()
