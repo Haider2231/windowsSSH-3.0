@@ -107,6 +107,9 @@ class CopilotAgentWidget(QtWidgets.QWidget):
         self.chat_area.append(f"<b>Copilot:</b><br>{html}<br>")
 
     def show_ssh_output(self, data):
+        # No mostrar salida SSH en modo AGENT según solicitud del usuario
+        if self.agent_mode == "AGENT":
+            return
         self.chat_area.append(f"<b>SSH:</b><br><pre>{data}</pre><br>")
 
     def show_error_message(self, message):
@@ -115,8 +118,16 @@ class CopilotAgentWidget(QtWidgets.QWidget):
     def _get_system_prompt(self):
         if self.agent_mode == "AGENT":
             return (
-                "Eres un agente automatizado que responde únicamente con el comando exacto de Bash necesario para cumplir la instrucción del usuario. "
-                "No incluyas explicaciones, contexto, ni advertencias. Solo responde con un bloque de código que contenga el comando necesario."
+                "ACTÚA COMO UN EJECUTOR DE COMANDOS.\n"
+                "Instrucciones estrictas de formato (DEBES CUMPLIRLAS):\n"
+                "1. Devuelve ÚNICAMENTE un bloque de código fenced con triple backticks.\n"
+                "2. No añadas texto antes ni después del bloque. Nada de explicaciones.\n"
+                "3. Dentro del bloque, la PRIMERA línea debe ser exactamente el comando Bash a ejecutar.\n"
+                "4. No incluyas prefijos como $, #, ni comentarios.\n"
+                "5. Si necesitas varios comandos, sepáralos en líneas sucesivas (una por línea) SIN comentarios.\n"
+                "6. No uses backticks dentro del bloque salvo los de apertura/cierre.\n"
+                "Ejemplos válidos:```\nls -la\n```  o  ```\nmkdir informes\ncd informes\n```\n"
+                "Ejemplo inválido (NO HACER): Texto fuera del bloque o explicaciones."
             )
         else:
             return (

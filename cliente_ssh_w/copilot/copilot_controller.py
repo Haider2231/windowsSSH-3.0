@@ -18,12 +18,25 @@ class CopilotController(QObject):
         self._init_ssh_output_connection()
 
     def _init_ssh_output_connection(self):
-        if self.ssh and hasattr(self.ssh, 'output_ready'):
-            self.ssh.output_ready.connect(self.handle_ssh_output)
+        # Conectar a la señal correcta del backend (send_output). Se mantiene compatibilidad si hubiera 'output_ready'.
+        if self.ssh:
+            if hasattr(self.ssh, 'send_output'):
+                try:
+                    self.ssh.send_output.connect(self.handle_ssh_output)
+                except Exception:
+                    pass
+            elif hasattr(self.ssh, 'output_ready'):
+                try:
+                    self.ssh.output_ready.connect(self.handle_ssh_output)
+                except Exception:
+                    pass
 
     def set_system_prompt(self, prompt):
         self.system_prompt = prompt
         self.reset_history()
+        # Asegurar modo por defecto si no está definido
+        if not hasattr(self, 'mode'):
+            self.mode = 'ASK'
 
     def reset_history(self):
         self.history = [{"role": "system", "content": self.system_prompt}]
@@ -71,7 +84,10 @@ class CopilotController(QObject):
             code = self.md.extract_code(content)
             # Solo enviar comandos si el modo es AGENT
             if code and self.ssh and getattr(self, 'mode', 'ASK') == "AGENT":
-                self.ssh.send_command(code)
+                try:
+                    self.ssh.send_command(code)
+                except Exception as e:
+                    self.error_occurred.emit(f"Error enviando comando SSH: {e}")
         except Exception as e:
             self.error_occurred.emit(f"Error procesando respuesta: {e}")
 

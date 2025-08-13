@@ -1,6 +1,6 @@
 from PyQt6.QtCore import QObject, pyqtSignal, pyqtSlot
 from .sshshellreader import ShellReaderThread
-
+import time
 import paramiko
 
 
@@ -62,14 +62,22 @@ class Backend(QObject):
 
     @pyqtSlot(str)
     def write_data(self, data):
-        try:
-            if self.channel.send_ready():
-                try:
-                    self.channel.send(data)
-                except paramiko.SSHException as e:
-                    print(f"Error while writing to channel: {e}")
-        except Exception as e:
-            print(e)
+        """Envía datos al canal con pequeños reintentos si aún no está listo."""
+        max_attempts = 5
+        for attempt in range(max_attempts):
+            try:
+                if self.channel.send_ready():
+                    try:
+                        self.channel.send(data)
+                        return
+                    except paramiko.SSHException as e:
+                        print(f"Error while writing to channel: {e}")
+                        return
+                # Si no está listo, pequeña espera y reintenta
+                time.sleep(0.05)
+            except Exception as e:
+                print(e)
+                break
 
     @pyqtSlot(str)
     def set_pty_size(self, data):

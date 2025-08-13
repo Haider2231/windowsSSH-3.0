@@ -196,7 +196,10 @@ class Vista(QMainWindow):
 
             # Reconectar el servicio SSH al controlador Copilot
             self.copilot_controller.ssh = self.ssh_backend
-            if hasattr(self.ssh_backend, 'output_ready'):
+            # Conectar a la señal correcta del backend
+            if hasattr(self.ssh_backend, 'send_output'):
+                self.ssh_backend.send_output.connect(self.copilot_controller.handle_ssh_output)
+            elif hasattr(self.ssh_backend, 'output_ready'):
                 self.ssh_backend.output_ready.connect(self.copilot_controller.handle_ssh_output)
 
             terminal_layout.addWidget(self.terminal_container)
