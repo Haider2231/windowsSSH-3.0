@@ -47,6 +47,7 @@ class Vista(QMainWindow):
         self.ssh_terminal_widget = None
         self.ssh_backend = None
         self.copilot_widget = None
+        self._loading_dialog = None
 
     def _load_styles(self):
         """Carga y aplica los estilos definidos en styles/main.qss usando resources.py."""
@@ -115,6 +116,13 @@ class Vista(QMainWindow):
 
         self.connect_button = QPushButton("🌐 Conectar")
         self.connect_button.clicked.connect(self.on_connect_clicked)
+        # Permitir enviar con Enter desde el campo de clave y establecer botón por defecto
+        try:
+            self.password_entry.returnPressed.connect(self.on_connect_clicked)
+        except Exception:
+            pass
+        self.connect_button.setAutoDefault(True)
+        self.connect_button.setDefault(True)
         form_layout.addRow(self.connect_button)
 
     def on_connect_clicked(self):
@@ -144,6 +152,10 @@ class Vista(QMainWindow):
         if self.terminal_panel:
             self.terminal_panel.deleteLater()
             self.terminal_panel = None
+
+        # Mostrar cargando y deshabilitar formulario mientras se conecta
+        self._show_loading("Conectando al servidor SSH…")
+        self._set_form_enabled(False)
 
         from PyQt6.QtCore import QThread, QObject, pyqtSignal
 
@@ -205,8 +217,13 @@ class Vista(QMainWindow):
             self.form_widget.setVisible(False)
             self.settings_button.setVisible(False)
             self.disconnect_button.setVisible(True)
+            # Ocultar cargando y reactivar controles
+            self._hide_loading()
+            self._set_form_enabled(True)
         except Exception as e:
             self.show_error("No se pudo conectar: error al montar la terminal.\n" + str(e))
+            self._hide_loading()
+            self._set_form_enabled(True)
 
     def _on_ssh_error(self, error_msg):
         self.show_error("No se pudo conectar: credenciales incorrectas o error de conexión.\n" + error_msg)
@@ -216,6 +233,9 @@ class Vista(QMainWindow):
         self.terminal_container = None
         self.ssh_terminal_widget = None
         self.ssh_backend = None
+        # Ocultar cargando y reactivar formulario
+        self._hide_loading()
+        self._set_form_enabled(True)
 
     def on_disconnect_clicked(self):
         """Cierra la sesión SSH y restaura la interfaz inicial."""
@@ -249,6 +269,55 @@ class Vista(QMainWindow):
         # Dejar explícitamente al controlador Copilot sin backend SSH
         try:
             self.copilot_controller.set_ssh_service(None)
+        except Exception:
+            pass
+
+    def _set_form_enabled(self, enabled: bool):
+        """Habilita o deshabilita los campos del formulario y el botón de conexión."""
+        try:
+            self.host_entry.setEnabled(enabled)
+            self.port_entry.setEnabled(enabled)
+            self.user_entry.setEnabled(enabled)
+            self.password_entry.setEnabled(enabled)
+            self.connect_button.setEnabled(enabled)
+            self.settings_button.setEnabled(enabled)
+        except Exception:
+            pass
+
+    def _show_loading(self, text: str = "Procesando…"):
+        """Muestra un diálogo modal de progreso indeterminado."""
+        try:
+            if self._loading_dialog:
+                self._loading_dialog.close()
+                self._loading_dialog.deleteLater()
+                self._loading_dialog = None
+            dlg = QtWidgets.QProgressDialog(text, None, 0, 0, self)
+            dlg.setWindowTitle("Por favor espere")
+            try:
+                # En PyQt6 oculta el botón de cancelar vaciando el texto
+                dlg.setCancelButtonText("")
+            except Exception:
+                pass
+            dlg.setWindowModality(QtCore.Qt.WindowModality.ApplicationModal)
+            dlg.setMinimumDuration(0)
+            dlg.setAutoClose(False)
+            dlg.setAutoReset(False)
+            # Un poco más compacto
+            dlg.resize(360, 80)
+            self._loading_dialog = dlg
+            dlg.show()
+            # Asegurar que se pinte inmediatamente
+            QtWidgets.QApplication.processEvents()
+        except Exception as e:
+            print(f"No se pudo mostrar el diálogo de carga: {e}")
+
+    def _hide_loading(self):
+        """Oculta y destruye el diálogo de progreso si está visible."""
+        try:
+            if self._loading_dialog:
+                self._loading_dialog.close()
+                self._loading_dialog.deleteLater()
+                self._loading_dialog = None
         except Exception:
             pass
 
