@@ -1,31 +1,33 @@
-
 from PyQt6.QtGui import QTextOption
 from PyQt6 import QtWidgets, QtCore
 
 class CopilotAgentWidget(QtWidgets.QWidget):
+    """
+    Widget UI para interactuar con el controlador CopilotController.
+    """
     def closeEvent(self, event):
         # Desconectar señales del controlador
         try:
             self.controller.response_ready.disconnect(self.show_response)
         except Exception:
             pass
-        try:
-            self.controller.ssh_output_ready.disconnect(self.show_ssh_output)
-        except Exception:
-            pass
+        # Nota: no existe señal ssh_output_ready en CopilotController actual
         try:
             self.controller.error_occurred.disconnect(self.show_error_message)
         except Exception:
             pass
+
         # Limpiar hilo de envío si existe
         if hasattr(self, '_send_thread') and self._send_thread is not None:
-            self._send_thread.quit()
-            self._send_thread.wait()
+            try:
+                self._send_thread.quit()
+                self._send_thread.wait()
+            except Exception:
+                pass
             self._send_thread = None
+
         event.accept()
-    """
-    Widget UI para interactuar con el controlador CopilotController.
-    """
+
     def __init__(self, controller, parent=None):
         super().__init__(parent)
         self.controller = controller
@@ -68,6 +70,7 @@ class CopilotAgentWidget(QtWidgets.QWidget):
         self.prompt_entry.setPlaceholderText("Escribe tu pregunta o instrucción...")
         self.prompt_entry.returnPressed.connect(self.on_send)
         self.input_layout.addWidget(self.prompt_entry)
+
         self.send_button = QtWidgets.QPushButton("Enviar")
         self.send_button.clicked.connect(self.on_send)
         self.input_layout.addWidget(self.send_button)
@@ -75,18 +78,19 @@ class CopilotAgentWidget(QtWidgets.QWidget):
 
         # Conexión de señales del controlador
         self.controller.response_ready.connect(self.show_response)
-        self.controller.ssh_output_ready.connect(self.show_ssh_output)
         self.controller.error_occurred.connect(self.show_error_message)
 
         self._reset_conversation()
         self._load_styles()
+
+    # ----------------- UI Actions -----------------
 
     def _reset_conversation(self):
         self.chat_area.clear()
         self.controller.set_system_prompt(self._get_system_prompt())
 
     def _on_mode_changed(self, text):
-        self.agent_mode = text.upper()
+        self.agent_mode = text.upper()  # "ASK" o "AGENT"
         self.controller.set_mode(self.agent_mode)
         self._reset_conversation()
 
@@ -96,47 +100,73 @@ class CopilotAgentWidget(QtWidgets.QWidget):
             return
         self.chat_area.append(f"<b>Tú:</b> {prompt}<br>")
         self.prompt_entry.clear()
-        # Solo llama al controlador, que maneja el hilo
         try:
             self.controller.send_prompt(prompt)
         except Exception as e:
             self.chat_area.append(f"<span style='color:red;'><b>Error:</b> {str(e)}</span><br>")
             QtWidgets.QMessageBox.critical(self, "Error Copilot", str(e))
 
+    # ----------------- Slots (señales del controller) -----------------
+
     def show_response(self, html):
+        """Muestra respuesta del asistente en el chat (HTML ya renderizado)."""
         self.chat_area.append(f"<b>Copilot:</b><br>{html}<br>")
 
     def show_ssh_output(self, data):
-        # No mostrar salida SSH en modo AGENT según solicitud del usuario
-        if self.agent_mode == "AGENT":
-            return
-        self.chat_area.append(f"<b>SSH:</b><br><pre>{data}</pre><br>")
+        """
+        NO reflejar salida SSH en el chat NUNCA.
+        La terminal ya la muestra en su propio widget/vista.
+        """
+        return  # Intencionalmente vacío
 
     def show_error_message(self, message):
         self.chat_area.append(f"<span style='color:red;'><b>Error:</b> {message}</span><br>")
 
+    # ----------------- System Prompts -----------------
+
     def _get_system_prompt(self):
         if self.agent_mode == "AGENT":
             return (
-                "ACTÚA COMO UN EJECUTOR DE COMANDOS.\n"
-                "Instrucciones estrictas de formato (DEBES CUMPLIRLAS):\n"
-                "1. Devuelve ÚNICAMENTE un bloque de código fenced con triple backticks.\n"
-                "2. No añadas texto antes ni después del bloque. Nada de explicaciones.\n"
-                "3. Dentro del bloque, la PRIMERA línea debe ser exactamente el comando Bash a ejecutar.\n"
-                "4. No incluyas prefijos como $, #, ni comentarios.\n"
-                "5. Si necesitas varios comandos, sepáralos en líneas sucesivas (una por línea) SIN comentarios.\n"
-                "6. No uses backticks dentro del bloque salvo los de apertura/cierre.\n"
-                "Ejemplos válidos:```\nls -la\n```  o  ```\nmkdir informes\ncd informes\n```\n"
-                "Ejemplo inválido (NO HACER): Texto fuera del bloque o explicaciones."
+                 "MODO AGENTE (EJECUTOR DE COMANDOS + EXPLICACIÓN CORTA)\n"
+                    "Responde EXACTAMENTE en este formato (sin numeración):\n"
+                    "EXPLICACIÓN (máx. 4 líneas):\n"
+                    "...\n"
+                    "```bash\n"
+                    "# SOLO comandos idempotentes, una instrucción por línea, sin $ ni comentarios\n"
+                    "...\n"
+                    "```\n"
+                    "Reglas para el bloque bash:\n"
+                    "- Usa here-docs (cat <<'EOF' > archivo.ext) para crear archivos completos.\n"
+                    "- Incluye mkdir -p al crear rutas.\n"
+                    "- Evita comandos destructivos.\n"
+                    "- Para varios archivos, un here-doc por archivo.\n"
+                    "- Puedes añadir pruebas (p.ej. python3 archivo.py) al final.\n"
+                    "- Nada de texto fuera del bloque, salvo la EXPLICACIÓN arriba.\n"
+                    "Ejemplo válido:\n"
+                    "EXPLICACIÓN (máx. 4 líneas):\n"
+                    "Creará la carpeta demo, escribirá un script y lo ejecutará.\n"
+                    "```bash\n"
+                    "mkdir -p demo\n"
+                    "cat <<'PY' > demo/calculadora.py\n"
+                    "def suma(a,b):\n"
+                    "    return a+b\n"
+                    "if __name__ == '__main__':\n"
+                    "    print(suma(2,3))\n"
+                    "PY\n"
+                    "python3 demo/calculadora.py\n"
+                    "```"
             )
         else:
+            # ASK: responder pedagógicamente, sin comandos forzados
             return (
-                "Eres un agente inteligente integrado en una terminal embebida de Linux "
-                "también eres un asistente experto en Linux y administración de servidores. "
-                "Tu objetivo es enseñar de forma clara, profesional y concisa. "
-                "Cuando el usuario haga una pregunta, responde con explicaciones entendibles y ejemplos si es necesario, "
-                "pero evita ser demasiado extenso."
+                "MODO ASK (EXPLICACIÓN). Responde con claridad y de forma pedagógica.\n"
+                "SI, Y SOLO SI, el usuario pide pasos/acciones o un comando ayudaría, "
+                "incluye al final un bloque de código con triple backticks bash como sugerencia.\n"
+                "Si la pregunta es conceptual (p.ej. '¿qué es Linux?'), NO incluyas ningún bloque de código.\n"
+                "Nunca asumas credenciales ni ejecutes nada: el código en ASK es MERA SUGERENCIA."
             )
+
+    # ----------------- Estilos -----------------
 
     def _load_styles(self):
         try:

@@ -15,7 +15,7 @@ class Ui_Terminal(QWidget):
     """
     Terminal class extending QWidget to enable SSH connections in a Qt widget.
     """
-    
+
     def __init__(self, connect_info, parent=None):
         """
         Initialization function for the Terminal class.
@@ -25,11 +25,13 @@ class Ui_Terminal(QWidget):
         """
         super().__init__(parent)
         self.host = connect_info.get('host')
-        self.port = connect_info.get('port') # Get port from connect_info
+        self.port = connect_info.get('port')  # Get port from connect_info
         self.username = connect_info.get('username')
         self.password = connect_info.get('password')
         self.div_height = 0
         self.initial_buffer = ""
+        self._frontend_ready = False
+        self._pending_outputs = []  # cola para datos antes de que JS defina handle_output
 
         self.setupUi(self)
 
@@ -56,7 +58,8 @@ class Ui_Terminal(QWidget):
 
         self.view.resizeEvent = self.handle_resize_event
         self.view.loadFinished.connect(self.handle_load_finished)
-        self.backend.send_output.connect(lambda data: self.view.page().runJavaScript(f"window.handle_output({json.dumps(data)})"))
+        # Conectar salida del backend con protección hasta que JS esté listo
+        self.backend.send_output.connect(self._on_backend_output)
 
         html_path = os.path.join(os.path.dirname(__file__), "qtsshcon.html")
         self.view.load(QUrl.fromLocalFile(os.path.abspath(html_path)))
@@ -68,7 +71,11 @@ class Ui_Terminal(QWidget):
         """
         Updates the div height of the terminal.
         """
-        script = f"document.getElementById('terminal').style.height = '{self.div_height}px';"
+        script = (
+            "(function(){var el=document.getElementById('terminal');"
+            f"if(el){{el.style.height='{self.div_height}px';}}"
+            "})()"
+        )
         self.view.page().runJavaScript(script)
 
     def handle_load_finished(self):
@@ -81,7 +88,24 @@ class Ui_Terminal(QWidget):
         new_size = QSize(current_size.width(), current_size.height() + 1)
         self.view.resize(new_size)
         print("loaded..")
-        QTimer.singleShot(0, self.delayed_method)
+
+        # Comprobar si el entorno JS está listo (window.backend y handle_output)
+        def mark_ready(ok):
+            # ok es True si ambas funciones existen en JS
+            self._frontend_ready = bool(ok)
+            if self._frontend_ready:
+                # volcar cualquier salida pendiente
+                for data in self._pending_outputs:
+                    try:
+                        self.view.page().runJavaScript(f"window.handle_output({json.dumps(data)})")
+                    except Exception as e:
+                        print(f"Error flushing pending output: {e}")
+                self._pending_outputs.clear()
+            QTimer.singleShot(0, self.delayed_method)
+
+        # Evaluar JS para verificar existencia de objetos/fns
+        check_js = "typeof window !== 'undefined' && typeof window.handle_output === 'function' && typeof window.backend !== 'undefined'"
+        self.view.page().runJavaScript(check_js, mark_ready)
 
     def handle_resize_event(self, event):
         """
@@ -109,7 +133,21 @@ class Ui_Terminal(QWidget):
         """
         print(f"Buffer: {json.dumps(self.initial_buffer)}")
         banner = json.dumps(self.initial_buffer).replace('"', '')
-        self.view.page().runJavaScript(f"term.write('{banner}');")
+        # Escribir banner solo si 'term' existe en JS
+        self.view.page().runJavaScript(
+            "typeof term !== 'undefined'",
+            lambda ok: self.view.page().runJavaScript(f"term.write('{banner}');") if ok else None,
+        )
+
+    def _on_backend_output(self, data: str):
+        """Envía datos al frontend si está listo; si no, los acumula."""
+        try:
+            if self._frontend_ready:
+                self.view.page().runJavaScript(f"window.handle_output({json.dumps(data)})")
+            else:
+                self._pending_outputs.append(data)
+        except Exception as e:
+            print(f"Error sending output to frontend: {e}")
 
 
 if __name__ == "__main__":

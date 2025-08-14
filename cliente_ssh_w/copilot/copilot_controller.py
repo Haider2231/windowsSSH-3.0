@@ -4,7 +4,6 @@ class CopilotController(QObject):
     def set_mode(self, mode: str):
         self.mode = mode.upper() if isinstance(mode, str) else "ASK"
     response_ready = pyqtSignal(str)
-    ssh_output_ready = pyqtSignal(str)
     error_occurred = pyqtSignal(str)
 
     def __init__(self, openai_service, markdown_service, ssh_service=None, model="gpt-3.5-turbo"):
@@ -15,21 +14,10 @@ class CopilotController(QObject):
         self.model = model
         self.history = []
         self.system_prompt = ""
-        self._init_ssh_output_connection()
 
-    def _init_ssh_output_connection(self):
-        # Conectar a la señal correcta del backend (send_output). Se mantiene compatibilidad si hubiera 'output_ready'.
-        if self.ssh:
-            if hasattr(self.ssh, 'send_output'):
-                try:
-                    self.ssh.send_output.connect(self.handle_ssh_output)
-                except Exception:
-                    pass
-            elif hasattr(self.ssh, 'output_ready'):
-                try:
-                    self.ssh.output_ready.connect(self.handle_ssh_output)
-                except Exception:
-                    pass
+    def set_ssh_service(self, ssh_service):
+        """Setter explícito para actualizar el backend SSH que se usará para enviar comandos."""
+        self.ssh = ssh_service
 
     def set_system_prompt(self, prompt):
         self.system_prompt = prompt
@@ -93,6 +81,3 @@ class CopilotController(QObject):
 
     def _on_openai_error(self, error_msg):
         self.error_occurred.emit(f"Error en OpenAI: {error_msg}")
-
-    def handle_ssh_output(self, data):
-        self.ssh_output_ready.emit(data)

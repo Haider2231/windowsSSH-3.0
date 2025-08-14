@@ -194,13 +194,8 @@ class Vista(QMainWindow):
 
             self.ssh_backend = getattr(self.ssh_terminal_widget, 'backend', None)
 
-            # Reconectar el servicio SSH al controlador Copilot
-            self.copilot_controller.ssh = self.ssh_backend
-            # Conectar a la señal correcta del backend
-            if hasattr(self.ssh_backend, 'send_output'):
-                self.ssh_backend.send_output.connect(self.copilot_controller.handle_ssh_output)
-            elif hasattr(self.ssh_backend, 'output_ready'):
-                self.ssh_backend.output_ready.connect(self.copilot_controller.handle_ssh_output)
+            # Entregar backend SSH al controlador Copilot (setter reconecta señales internamente)
+            self.copilot_controller.set_ssh_service(self.ssh_backend)
 
             terminal_layout.addWidget(self.terminal_container)
             self.main_layout.addWidget(self.terminal_panel)
@@ -251,6 +246,11 @@ class Vista(QMainWindow):
         # Limpiar el campo de clave
         if hasattr(self, 'password_entry'):
             self.password_entry.clear()
+        # Dejar explícitamente al controlador Copilot sin backend SSH
+        try:
+            self.copilot_controller.set_ssh_service(None)
+        except Exception:
+            pass
 
     @QtCore.pyqtSlot(str)
     def show_error(self, message):

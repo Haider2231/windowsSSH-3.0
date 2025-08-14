@@ -10,13 +10,14 @@ if (terminalElement) {
     // Enable fit on the terminal whenever the window is resized
     window.addEventListener('resize', () => {
         fitAddon.fit();
-
+        const size_dim = 'cols:' +  term.cols + '::rows:' + term.rows;
+        console.log("front end window resize event: " + size_dim);
         try {
-
-            size_dim = 'cols:' +  term.cols + '::rows:' + term.rows;
-
-            console.log("front end window resize event: " + size_dim);
-            backend.set_pty_size(size_dim);
+            if (window.backend) {
+                window.backend.set_pty_size(size_dim);
+            } else {
+                throw new Error('backend is not defined');
+            }
         } catch (error) {
             console.error(error);
             console.log("Channel may not be up yet!")
@@ -25,8 +26,9 @@ if (terminalElement) {
 
     // When data is entered into the terminal, send it to the backend
     term.onData(e => {
-        // console.log(e);
-        backend.write_data(e);
+        if (window.backend) {
+            window.backend.write_data(e);
+        }
     });
 
     // Function to handle incoming data from the backend

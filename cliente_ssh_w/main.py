@@ -48,7 +48,7 @@ def main():
 
     # Inicializar controlador SSH y Copilot
     controlador = Controlador(default_host, default_port, usuario, clave)
-    copilot_controller = CopilotController(openai_service, markdown_service, ssh_service=controlador)
+    copilot_controller = CopilotController(openai_service, markdown_service, ssh_service=None)
 
     # Aplicar hoja de estilos
     app.setStyleSheet(load_qss("styles/main.qss"))

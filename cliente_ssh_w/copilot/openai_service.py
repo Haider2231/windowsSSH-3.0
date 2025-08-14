@@ -1,15 +1,17 @@
-import openai
+from openai import OpenAI
 import os
+
 
 class OpenAIServiceError(Exception):
     pass
 
+
 class OpenAIService:
     def __init__(self, api_key, default_model=None, timeout=None):
-        self.client = openai.OpenAI(api_key=api_key)
-        self.default_model = default_model or os.getenv("OPENAI_DEFAULT_MODEL", "gpt-3.5-turbo")
+        # Cliente oficial OpenAI v1
+        self.client = OpenAI(api_key=api_key)
+        self.default_model = default_model or os.getenv("OPENAI_DEFAULT_MODEL", "gpt-5")
         self.timeout = timeout or float(os.getenv("OPENAI_TIMEOUT", "30"))
-
 
     def chat(self, messages, model=None, timeout=None):
         """Envía mensajes al modelo especificado y retorna la respuesta. Maneja errores y permite timeout/modelo por defecto."""
