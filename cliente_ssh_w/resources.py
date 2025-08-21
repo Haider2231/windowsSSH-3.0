@@ -1,8 +1,14 @@
 import os
+import sys
 
 def resource_path(rel):
-    """Devuelve la ruta absoluta de un recurso a partir de una ruta relativa al archivo actual."""
-    return os.path.join(os.path.dirname(__file__), rel)
+    """Devuelve la ruta absoluta de un recurso, compatible con PyInstaller (onefile/onedir).
+
+    - En desarrollo usa la carpeta del archivo actual.
+    - En ejecutable onefile usa la carpeta temporal sys._MEIPASS donde PyInstaller extrae los datos.
+    """
+    base = getattr(sys, "_MEIPASS", os.path.dirname(__file__))
+    return os.path.join(base, rel)
 
 
 def load_qss(file):

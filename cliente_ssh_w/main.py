@@ -25,8 +25,18 @@ if library_path not in sys.path:
 def main():
     # Crear la aplicación antes de instanciar cualquier QWidget
     app = QtWidgets.QApplication(sys.argv)
-    # Cargar variables de entorno desde .env dentro del bundle
-    load_dotenv(resource_path('.env'))
+    # Cargar variables de entorno desde .env dentro del bundle (compatible con PyInstaller)
+    # Intentar varias ubicaciones posibles según --add-data
+    env_candidates = ['.env', 'cliente_ssh_w/.env']
+    loaded_from = None
+    for cand in env_candidates:
+        try:
+            path = resource_path(cand)
+            if os.path.exists(path):
+                load_dotenv(path)
+                loaded_from = path
+        except Exception:
+            pass
     # Registrar esquema 'ssh' personalizado
     if QWebEngineUrlScheme.schemeByName(b"ssh").name().isEmpty():
         ssh_scheme = QWebEngineUrlScheme(b"ssh")
@@ -41,7 +51,8 @@ def main():
     # Inicializar servicios de OpenAI y Markdown
     api_key = os.environ.get("OPENAI_API_KEY")
     if not api_key:
-        QtWidgets.QMessageBox.critical(None, "Error crítico", "No se encontró la clave OPENAI_API_KEY en el entorno.")
+        hint = loaded_from if loaded_from else "(no se encontró .env empaquetado)"
+        QtWidgets.QMessageBox.critical(None, "Error crítico", f"No se encontró la clave OPENAI_API_KEY. Verifica .env en: {hint}")
         sys.exit(1)
     openai_service = OpenAIService(api_key)
     markdown_service = MarkdownService()
