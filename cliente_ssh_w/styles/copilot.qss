@@ -1,3 +1,6 @@
+/* =========================
+   Estilos base existentes
+   ========================= */
 QTextEdit {
     background: #23272e;
     color: #e6e6e6;
@@ -25,3 +28,32 @@ QPushButton {
 QPushButton:hover {
     background-color: #005fa1;
 }
+
+/* ==============================================
+   Override específico para la barra de texto (prompt)
+   Aplica la estética del QLineEdit al QTextEdit del prompt
+   - Requiere: prompt_entry.setObjectName("promptEntry")
+   ============================================== */
+QTextEdit#promptEntry,
+QLineEdit#promptEntry {
+    /* Copiamos la “piel” del QLineEdit para mantener estética */
+    border-radius: 4px;
+    border: 1px solid #ccc;
+    padding: 6px;
+
+    /* Forzamos paleta del sistema para que NO herede el fondo/tono del QTextEdit general */
+    background: palette(Base);
+    color: palette(Text);
+
+    /* Evitar tipografía monoespaciada del QTextEdit general en el prompt */
+    font-family: inherit;
+    font-size: 15px;
+    line-height: 1.4;
+}
+
+/* (Opcional: si quieres un focus visible, descomenta y ajusta)
+QTextEdit#promptEntry:focus,
+QLineEdit#promptEntry:focus {
+    border: 1px solid #0078d7;
+}
+*/

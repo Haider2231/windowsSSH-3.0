@@ -1,5 +1,6 @@
 from PyQt6.QtGui import QTextOption
 from PyQt6 import QtWidgets, QtCore
+from .widgets import AutoGrowTextEdit
 
 class CopilotAgentWidget(QtWidgets.QWidget):
     """
@@ -66,15 +67,17 @@ class CopilotAgentWidget(QtWidgets.QWidget):
 
         # Entrada del usuario
         self.input_layout = QtWidgets.QHBoxLayout()
-        self.prompt_entry = QtWidgets.QLineEdit()
-        self.prompt_entry.setPlaceholderText("Escribe tu pregunta o instrucción...")
-        self.prompt_entry.returnPressed.connect(self.on_send)
+        self.prompt_entry = AutoGrowTextEdit(max_visible_lines=7)
+        self.prompt_entry.setObjectName("promptEntry")  # Para que aplique el mismo QSS
         self.input_layout.addWidget(self.prompt_entry)
 
         self.send_button = QtWidgets.QPushButton("Enviar")
         self.send_button.clicked.connect(self.on_send)
         self.input_layout.addWidget(self.send_button)
         self.layout.addLayout(self.input_layout)
+
+        # Conectar la señal de Enter (sin Shift) ignorando el texto emitido
+        self.prompt_entry.submitted.connect(lambda _text: self.on_send())
 
         # Conexión de señales del controlador
         self.controller.response_ready.connect(self.show_response)
@@ -95,7 +98,7 @@ class CopilotAgentWidget(QtWidgets.QWidget):
         self._reset_conversation()
 
     def on_send(self):
-        prompt = self.prompt_entry.text().strip()
+        prompt = self.prompt_entry.toPlainText().strip()
         if not prompt:
             return
         self.chat_area.append(f"<b>Tú:</b> {prompt}<br>")
@@ -105,6 +108,7 @@ class CopilotAgentWidget(QtWidgets.QWidget):
         except Exception as e:
             self.chat_area.append(f"<span style='color:red;'><b>Error:</b> {str(e)}</span><br>")
             QtWidgets.QMessageBox.critical(self, "Error Copilot", str(e))
+
 
     # ----------------- Slots (señales del controller) -----------------
 
